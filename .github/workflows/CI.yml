@@ -59,3 +59,5 @@ jobs:
           ./dist/win-x64/secrets-migrator-windows-amd64.exe
           ./dist/linux-x64/secrets-migrator-linux-amd64
           ./dist/osx-x64/secrets-migrator-darwin-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
