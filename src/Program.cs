@@ -130,10 +130,11 @@ jobs:
               
               # Use gh secret set. It handles fetching the public key and encryption automatically.
               # We pipe the secret value to the command to avoid it appearing in logs.
-              $secretValue | gh --hostname {targetHostname} secret set $secretName --repo $targetRepo
+              $secretValue | gh secret set $secretName --repo $targetRepo
             }}
           }}
         env:
+          GH_HOST: '{targetHostname}'
           GH_TOKEN: ${{{{ secrets.SECRETS_MIGRATOR_PAT }}}}
           GH_ENTERPRISE_TOKEN: ${{{{ secrets.SECRETS_MIGRATOR_PAT }}}}
           REPO_SECRETS: ${{{{ toJSON(secrets) }}}}
