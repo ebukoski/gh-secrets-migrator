@@ -171,7 +171,7 @@ namespace SecretsMigrator
 
         public virtual async Task UpdateBranch(string org, string repo, string branchName, string commitSha)
         {
-            var url = $"{_apiUrl}/repos/{org}/{repo}/git/ref/heads/{branchName}";
+            var url = $"{_apiUrl}/repos/{org}/{repo}/git/refs/heads/{branchName}";
 
             var payload = new
             {
