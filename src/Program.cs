@@ -78,7 +78,15 @@ namespace SecretsMigrator
 
             var defaultBranch = await githubApi.GetDefaultBranch(sourceOrg, sourceRepo);
             var masterCommitSha = await githubApi.GetCommitSha(sourceOrg, sourceRepo, defaultBranch);
-            await githubApi.CreateBranch(sourceOrg, sourceRepo, branchName, masterCommitSha);
+            try
+            {
+                await githubApi.CreateBranch(sourceOrg, sourceRepo, branchName, masterCommitSha);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+            {
+                _log.LogInformation($"Branch '{branchName}' already exists, updating it...");
+                await githubApi.UpdateBranch(sourceOrg, sourceRepo, branchName, masterCommitSha);
+            }
 
             await githubApi.CreateFile(sourceOrg, sourceRepo, branchName, ".github/workflows/migrate-secrets.yml", workflow);
 
