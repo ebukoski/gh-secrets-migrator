@@ -43,6 +43,10 @@ namespace SecretsMigrator
             {
                 IsRequired = false
             };
+            var targetHostname = new Option<string>("--target-hostname", () => "github.com")
+            {
+                IsRequired = false
+            };
 
             root.AddOption(sourceOrg);
             root.AddOption(sourceRepo);
@@ -51,13 +55,14 @@ namespace SecretsMigrator
             root.AddOption(sourcePat);
             root.AddOption(targetPat);
             root.AddOption(verbose);
+            root.AddOption(targetHostname);
 
-            root.Handler = CommandHandler.Create<string, string, string, string, string, string, bool>(Invoke);
+            root.Handler = CommandHandler.Create<string, string, string, string, string, string, bool, string>(Invoke);
 
             await root.InvokeAsync(args);
         }
 
-        public static async Task Invoke(string sourceOrg, string sourceRepo, string targetOrg, string targetRepo, string sourcePat, string targetPat, bool verbose = false)
+        public static async Task Invoke(string sourceOrg, string sourceRepo, string targetOrg, string targetRepo, string sourcePat, string targetPat, bool verbose = false, string targetHostname = "github.com")
         {
             _log.Verbose = verbose;
 
@@ -66,9 +71,10 @@ namespace SecretsMigrator
             _log.LogInformation($"SOURCE REPO: {sourceRepo}");
             _log.LogInformation($"TARGET ORG: {targetOrg}");
             _log.LogInformation($"TARGET REPO: {targetRepo}");
+            _log.LogInformation($"TARGET HOSTNAME: {targetHostname}");
 
             var branchName = "migrate-secrets";
-            var workflow = GenerateWorkflow(targetOrg, targetRepo, branchName);
+            var workflow = GenerateWorkflow(targetOrg, targetRepo, branchName, targetHostname);
 
             var githubClient = new GithubClient(_log, sourcePat);
             var githubApi = new GithubApi(githubClient, "https://api.github.com");
@@ -93,7 +99,7 @@ namespace SecretsMigrator
             _log.LogSuccess($"Secrets migration in progress. Check on status at https://github.com/{sourceOrg}/{sourceRepo}/actions");
         }
 
-        private static string GenerateWorkflow(string targetOrg, string targetRepo, string branchName)
+        private static string GenerateWorkflow(string targetOrg, string targetRepo, string branchName, string targetHostname = "github.com")
         {
             var result = $@"
 name: move-secrets
@@ -124,13 +130,12 @@ jobs:
               
               # Use gh secret set. It handles fetching the public key and encryption automatically.
               # We pipe the secret value to the command to avoid it appearing in logs.
-              $secretValue | gh secret set $secretName --repo $targetRepo
+              $secretValue | gh secret set $secretName --repo $targetRepo --hostname {targetHostname}
             }}
           }}
         env:
-          # The GitHub CLI uses the GH_TOKEN environment variable for authentication.
-          # We assign the Personal Access Token (PAT) from your secrets to it.
           GH_TOKEN: ${{{{ secrets.SECRETS_MIGRATOR_PAT }}}}
+          GH_ENTERPRISE_TOKEN: ${{{{ secrets.SECRETS_MIGRATOR_PAT }}}}
           REPO_SECRETS: ${{{{ toJSON(secrets) }}}}
           TARGET_ORG: '{targetOrg}'
           TARGET_REPO: '{targetRepo}'
