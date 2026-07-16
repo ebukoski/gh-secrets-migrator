@@ -39,6 +39,50 @@ namespace SecretsMigrator
             _ = JObject.Parse(response);
         }
 
+        public virtual async Task DeleteBranch(string org, string repo, string branchName)
+        {
+            var url = $"{_apiUrl}/repos/{org}/{repo}/git/refs/heads/{branchName}";
+
+            await _client.DeleteAsync(url);
+        }
+
+        public virtual async Task<IList<(long Id, string HeadSha, string Status, string Conclusion)>> GetWorkflowRuns(
+            string org, string repo, string workflowFileName, string branch)
+        {
+            var url = $"{_apiUrl}/repos/{org}/{repo}/actions/workflows/{workflowFileName}/runs?branch={branch}";
+
+            string response;
+            try
+            {
+                response = await _client.GetAsync(url);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // The just-pushed workflow file may not be registered yet; treat as "no runs yet"
+                return new List<(long, string, string, string)>();
+            }
+
+            var data = JObject.Parse(response);
+
+            return data["workflow_runs"]
+                .Select(run => (
+                    (long)run["id"],
+                    (string)run["head_sha"],
+                    (string)run["status"],
+                    (string)run["conclusion"]))
+                .ToList();
+        }
+
+        public virtual async Task<(string Status, string Conclusion)> GetWorkflowRun(string org, string repo, long runId)
+        {
+            var url = $"{_apiUrl}/repos/{org}/{repo}/actions/runs/{runId}";
+
+            var response = await _client.GetAsync(url);
+            var data = JObject.Parse(response);
+
+            return ((string)data["status"], (string)data["conclusion"]);
+        }
+
         public virtual async Task<string> GetCommitSha(string org, string repo, string branch)
         {
             var url = $"{_apiUrl}/repos/{org}/{repo}/git/ref/heads/{branch}";
@@ -118,7 +162,7 @@ namespace SecretsMigrator
             return (string)data["tree"]["sha"];
         }
 
-        public virtual async Task CreateFile(string org, string repo, string branch, string filePath, string contents)
+        public virtual async Task<string> CreateFile(string org, string repo, string branch, string filePath, string contents)
         {
             var url = $"{_apiUrl}/repos/{org}/{repo}/contents/{filePath}";
 
@@ -129,7 +173,10 @@ namespace SecretsMigrator
                 branch
             };
 
-            await _client.PutAsync(url, payload);
+            var response = await _client.PutAsync(url, payload);
+            var data = JObject.Parse(response);
+
+            return (string)data["commit"]["sha"];
         }
 
         public virtual async Task<string> CreateTreeFromBlob(string org, string repo, string blobSha, string filename, string previousTreeSha)
