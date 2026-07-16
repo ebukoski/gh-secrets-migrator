@@ -67,6 +67,18 @@ namespace SecretsMigrator
             await _client.PutAsync(url, payload);
         }
 
+        public virtual async Task<IList<string>> GetRepoSecretNames(string org, string repo)
+        {
+            var url = $"{_apiUrl}/repos/{org}/{repo}/actions/secrets?per_page=100";
+
+            var response = await _client.GetAsync(url);
+            var data = JObject.Parse(response);
+
+            return data["secrets"]
+                .Select(secret => (string)secret["name"])
+                .ToList();
+        }
+
         public virtual async Task<(byte[] publicKey, string publicKeyId)> GetRepoPublicKey(string org, string repo)
         {
             var url = $"{_apiUrl}/repos/{org}/{repo}/actions/secrets/public-key";

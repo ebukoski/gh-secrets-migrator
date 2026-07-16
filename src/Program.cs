@@ -73,11 +73,24 @@ namespace SecretsMigrator
             _log.LogInformation($"TARGET REPO: {targetRepo}");
             _log.LogInformation($"TARGET HOSTNAME: {targetHostname}");
 
-            var branchName = "migrate-secrets";
-            var workflow = GenerateWorkflow(targetOrg, targetRepo, branchName, targetHostname);
-
             var githubClient = new GithubClient(_log, sourcePat);
             var githubApi = new GithubApi(githubClient, "https://api.github.com");
+
+            var secretNames = await githubApi.GetRepoSecretNames(sourceOrg, sourceRepo);
+            var migratableSecrets = secretNames
+                .Where(name => name != "github_token" && name != "SECRETS_MIGRATOR_PAT")
+                .ToList();
+
+            if (migratableSecrets.Count == 0)
+            {
+                _log.LogInformation($"No secrets to migrate from {sourceOrg}/{sourceRepo}. Skipping workflow creation.");
+                return;
+            }
+
+            _log.LogInformation($"Found {migratableSecrets.Count} secret(s) to migrate.");
+
+            var branchName = "migrate-secrets";
+            var workflow = GenerateWorkflow(targetOrg, targetRepo, branchName, targetHostname);
 
             var (publicKey, publicKeyId) = await githubApi.GetRepoPublicKey(sourceOrg, sourceRepo);
             await githubApi.CreateRepoSecret(sourceOrg, sourceRepo, publicKey, publicKeyId, "SECRETS_MIGRATOR_PAT", targetPat);
